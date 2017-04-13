@@ -4,3 +4,8 @@
 **4/13**<br>
 1. questionnaire 增加disable機制，不需要填的會disable
 2. 資料上傳部分，會檢查firebase最新一筆資料和sqlite上次上傳的最後一筆是否相同，相同才將舊的sqlite資料刪掉
+## Problem<br>
+**4/13**<br>
+1. 管理app工具會阻檔app服務自動啟動
+2. notification listener因為cache可能需要重開才可以連結<br>
+http://stackoverflow.com/questions/33530807/why-is-this-notificationlistenerservice-not-working
