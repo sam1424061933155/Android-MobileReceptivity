@@ -31,8 +31,15 @@ import android.util.Log;
 import android.view.WindowManager;
 import android.widget.Toast;
 
+import com.google.firebase.database.ChildEventListener;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+
+
+import com.google.firebase.database.Query;
+import com.google.firebase.database.ValueEventListener;
 import com.opencsv.CSVWriter;
 
 import org.json.JSONException;
@@ -188,12 +195,21 @@ public class UsageService extends Service {
     public int send_rowid_usage=-1;
     public int send_rowid_accessibility=-1;
     public int send_rowid_questionnaire=-1;
+    public String noti_key="-1";
+    public String usage_key="-1";
+    public String accessibility_key="-1";
+    public String questionnaire_key="-1";
+
+    public boolean toDelete=false;
     //public static Context context;
     //public static Context us;
 
     // for questionnaire
     public static String index_questionnaire;
     public static int usage_start=0;
+
+
+
 
 
 
@@ -1378,22 +1394,120 @@ public class UsageService extends Service {
 
     }
 
-    public  void queryitem(String table){
-        Log.d("usage","query item table= "+table);
-        //Log.d("db","query item");
-        SQLiteDatabase db = DatabaseManager.getInstance().openDatabase();
+    public synchronized void checkLastData(String table,String id){
+
+
+        final String temp_table=table;
+
+
+        Log.d("checkdata","table name "+ temp_table);
+
+        if(table.equals("usage")){
+            table="context";
+        }
+
+        DatabaseReference mDatabase;
+        mDatabase = FirebaseDatabase.getInstance().getReference(table+"/user/"+id);
+        Query queryRef = mDatabase.orderByKey().limitToLast(1);
+        queryRef.keepSynced(true);
+        queryRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public synchronized void onDataChange(DataSnapshot dataSnapshot) {
+
+                if(dataSnapshot.getValue()!=null){
+
+                    Log.d("checkdata","datasnapshot.getvalue = "+dataSnapshot.getValue().toString());
+                    SQLiteDatabase db;
+                    Cursor cursor;
+                    toDelete=false;
+                    String child="-1";
+                    if(temp_table.equals("notification")){
+                        child=noti_key;
+                    }else if(temp_table.equals("usage")){
+                        child=usage_key;
+                    }else if(temp_table.equals("accessibility")){
+                        child=accessibility_key;
+                    }else if(temp_table.equals("questionnaire")){
+                        child=questionnaire_key;
+                    }
+                    if(dataSnapshot.hasChild(child)){
+                        toDelete=true;
+                    }
+                    Log.d("checkdata","table name "+ temp_table+" ,and checkdata todelete =  "+toDelete);
+                    if(toDelete){
+
+                        db = DatabaseManager.getInstance().openDatabase();
+                        cursor = db.rawQuery("SELECT * FROM "+temp_table, null);
+                        Log.d("checkdata","table name "+ temp_table+" ,rowCount before delete= "+cursor.getCount());
+                        if(cursor.getCount()>0){
+                            cursor.moveToFirst();
+                            int start=Integer.parseInt(cursor.getString(0));
+                            int last=-1;
+                            if(temp_table.equals("notification")){
+                                last=send_rowid_noti;
+
+                            }else if(temp_table.equals("usage")){
+                                last=send_rowid_usage;
+
+                            }else if(temp_table.equals("accessibility")){
+                                last=send_rowid_accessibility;
+
+                            }else if(temp_table.equals("questionnaire")){
+                                last=send_rowid_questionnaire;
+
+                            }
+                            Log.d("checkdata","table name "+ temp_table+" before delete");
+                            Log.d("checkdata","table name "+ temp_table+" before delete from start= "+start +"last= "+last);
+                            for(int i=start;i<=last;i++){
+                                db.delete(temp_table,"rowid="+i,null);
+                            }
+
+                            Log.d("checkdata","table name "+ temp_table+" rowCount after delete= "+cursor.getCount());
+
+                            cursor.close();
+                            DatabaseManager.getInstance().closeDatabase();
+
+                        }
+
+                    }
+
+
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+
+    }
+
+    public synchronized void queryitem(String table){
+
+        SQLiteDatabase db;
         ArrayList<String> create_record = new ArrayList<>();
-        Cursor cursor = db.rawQuery("SELECT * FROM "+table, null);
+        Cursor cursor;
+        int start;
         Log.d("db","query item after select");
+
+        Log.d("checkdata","table name "+ table+ " start check");
+        checkLastData(table,Constants.DEVICE_ID);
+
+        Log.d("checkdata","table name "+ table+ " after check");
+
+        db = DatabaseManager.getInstance().openDatabase();
+        cursor = db.rawQuery("SELECT * FROM "+table, null);
+        Log.d("checkdata","table name "+ table+ " outside delete rowCount= "+cursor.getCount());
 
         Log.d("db","row= "+cursor.getCount());
         int row=cursor.getCount();
         int col=cursor.getColumnCount();
-        int last=-1;
+        //int last=-1;
         int query=0;
         if(row!=0){
             cursor.moveToFirst();
-            int start=Integer.parseInt(cursor.getString(0));
+            start=Integer.parseInt(cursor.getString(0));
             if(table.equals("notification")){
                 if(start!=send_rowid_noti){
                     query=1;
@@ -1427,7 +1541,9 @@ public class UsageService extends Service {
 
                             uploadToFireDB("notification",Constants.DEVICE_ID,create_record,cursor.getString(0));
                             send_rowid_noti=Integer.parseInt(cursor.getString(0));
-                            last=send_rowid_noti;
+                            //last=send_rowid_noti;
+                            noti_key = create_record.get(1)+"|"+cursor.getString(0);
+
                         }else if(table.equals("usage")){
                             Log.d("db","size of create usage = "+create_record.size());
                             Log.d("usage","before upload to firebase usage");
@@ -1435,14 +1551,18 @@ public class UsageService extends Service {
 
                             uploadToFireDB("context",Constants.DEVICE_ID,create_record,cursor.getString(0));
                             send_rowid_usage=Integer.parseInt(cursor.getString(0));
-                            last=send_rowid_usage;
+                            //last=send_rowid_usage;
+                            usage_key = create_record.get(1)+"|"+cursor.getString(0);
+
                         }else if(table.equals("accessibility")){
                             Log.d("db","size of create accessibility = "+create_record.size());
                             Log.d("usage","before upload to firebase accessibility");
 
                             uploadToFireDB("accessibility",Constants.DEVICE_ID,create_record,cursor.getString(0));
                             send_rowid_accessibility=Integer.parseInt(cursor.getString(0));
-                            last=send_rowid_accessibility;
+                            //last=send_rowid_accessibility;
+                            accessibility_key = create_record.get(1)+"|"+cursor.getString(0);
+
 
                         }else if(table.equals("questionnaire")){
                             Log.d("db","size of create questionnaire = "+create_record.size());
@@ -1450,22 +1570,26 @@ public class UsageService extends Service {
 
                             uploadToFireDB("questionnaire",Constants.DEVICE_ID,create_record,cursor.getString(0));
                             send_rowid_questionnaire=Integer.parseInt(cursor.getString(0));
-                            last=send_rowid_questionnaire;
+                            //last=send_rowid_questionnaire;
+                            questionnaire_key = create_record.get(1)+"|"+cursor.getString(0);
+
                         }
                         cursor.moveToNext();
                         create_record.clear();
                     }
                 }finally {
                     cursor.close();
-                    //DatabaseManager.getInstance().closeDatabase();
+                    DatabaseManager.getInstance().closeDatabase();
+                    Log.d("checkdata","after upload");
+
                 }
-                Log.d("usage","query item before delete");
-                Log.d("db","query item start= "+start +"last= "+last);
+                /*Log.d("checkdata","to delete table "+table);
+                Log.d("checkdata","before delete item start= "+start +"last= "+last);
                 for(int i=start;i<=last;i++){
                     db.delete(table,"rowid="+i,null);
                 }
                 DatabaseManager.getInstance().closeDatabase();
-                Log.d("usage","query item after delete");
+                Log.d("checkdata","data after delete");*/
 
             }
         }else{
