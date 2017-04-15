@@ -10,8 +10,8 @@
 ## Problem<br>
 **4/13**<br>
 1. 管理app工具會阻檔app服務自動啟動
-2. notification listener因為cache可能需要重開才可以連結
-http://stackoverflow.com/questions/33530807/why-is-this-notificationlistenerservice-not-working  
+2. notification listener因為cache可能需要重開才可以連結<br>
+http://stackoverflow.com/questions/33530807/why-is-this-notificationlistenerservice-not-working  
 
 **4/15**<br>
 1. datasnapshot.getvalue(class name) not working
