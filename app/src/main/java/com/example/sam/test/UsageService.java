@@ -38,6 +38,7 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 
 
+import com.google.firebase.database.GenericTypeIndicator;
 import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 import com.opencsv.CSVWriter;
@@ -48,8 +49,12 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.TimeZone;
@@ -200,9 +205,7 @@ public class UsageService extends Service {
     public String accessibility_key="-1";
     public String questionnaire_key="-1";
 
-    public boolean toDelete=false;
-    //public static Context context;
-    //public static Context us;
+    public int upload_time=0;
 
     // for questionnaire
     public static String index_questionnaire;
@@ -344,9 +347,10 @@ public class UsageService extends Service {
         ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo networkInfo = cm.getActiveNetworkInfo();
         if (networkInfo != null && networkInfo.isConnected()) {
-            queryitem("notification");
-            queryitem("usage");
-            queryitem("questionnaire");
+            checkLastData("notification");
+            checkLastData("usage");
+            checkLastData("accessibility");
+            checkLastData("questionnaire");
         }
 
 
@@ -520,9 +524,9 @@ public class UsageService extends Service {
                         getCurrentTimeInMillis()- 5000,
                         //end time: until now
                         getCurrentTimeInMillis());
-                //Log.d("usage","applist size "+appList.size());
-                //Log.d("applist",String.valueOf(appList.size()));
-                if(appList!=null && appList.size()>0 && DBHelper.checkdb==1){
+                Log.d("usage","applist size "+appList.size());
+                Log.d("usage","checkdb "+DBHelper.checkdb);
+                if(appList!=null && appList.size()>0 ){
                     //isUsage=1;
                     Log.d("usage","=====start=====");
                     usage_start=1;
@@ -597,7 +601,7 @@ public class UsageService extends Service {
                             inPrcoess=1;
 
                             if(mIsConnected==true){
-                                queryitem("questionnaire");
+                                checkLastData("questionnaire");
                             }
 
                             Log.d("data ","before preprocess");
@@ -614,7 +618,7 @@ public class UsageService extends Service {
                                 }
 
                                 //handle.post(showdialog);
-                                handle.postDelayed(showdialog,10000);
+                                handle.postDelayed(showdialog,5000);
                                 Log.d("question","send question");
                                 writeSystemLog(getCurrentTimeInMillis(),"usage service send questionnaire");
 
@@ -642,9 +646,9 @@ public class UsageService extends Service {
                     // IF NETWORK CONNECT UPLOAD DATA
 
                     if(mIsWifiConnected==true){
-                        queryitem("notification");
-                        queryitem("usage");
-                        queryitem("accessibility");
+                        checkLastData("notification");
+                        checkLastData("usage");
+                        checkLastData("accessibility");
                         //queryitem("questionnaire");
                     }
 
@@ -654,7 +658,7 @@ public class UsageService extends Service {
                 if(interactive==false){
                     screenClose=1;
                 }
-                if(appList.size()==0 && usage_start==1 && DBHelper.checkdb==1){
+                if(appList.size()==0 && usage_start==1 ){
                     //isUsage=0;
                     Log.d("applist","no item");
                     //ArrayList<String> no = new ArrayList<>();
@@ -1394,7 +1398,7 @@ public class UsageService extends Service {
 
     }
 
-    public synchronized void checkLastData(String table,String id){
+    public synchronized void checkLastData(String table){
 
 
         final String temp_table=table;
@@ -1407,72 +1411,215 @@ public class UsageService extends Service {
         }
 
         DatabaseReference mDatabase;
-        mDatabase = FirebaseDatabase.getInstance().getReference(table+"/user/"+id);
+        mDatabase = FirebaseDatabase.getInstance().getReference(table+"/user/"+Constants.DEVICE_ID);
         Query queryRef = mDatabase.orderByKey().limitToLast(1);
         queryRef.keepSynced(true);
         queryRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public synchronized void onDataChange(DataSnapshot dataSnapshot) {
+                SQLiteDatabase db;
+                //ArrayList<String> create_record = new ArrayList<>();
+                Cursor cursor;
+
+                Log.d("checkdata_new","ondatachange");
+
 
                 if(dataSnapshot.getValue()!=null){
+                    Log.d("checkdata_new","table name = "+temp_table+ " dataSnapshot.getValue not null");
 
-                    Log.d("checkdata","datasnapshot.getvalue = "+dataSnapshot.getValue().toString());
-                    SQLiteDatabase db;
-                    Cursor cursor;
-                    toDelete=false;
-                    String child="-1";
-                    if(temp_table.equals("notification")){
-                        child=noti_key;
-                    }else if(temp_table.equals("usage")){
-                        child=usage_key;
-                    }else if(temp_table.equals("accessibility")){
-                        child=accessibility_key;
-                    }else if(temp_table.equals("questionnaire")){
-                        child=questionnaire_key;
-                    }
-                    if(dataSnapshot.hasChild(child)){
-                        toDelete=true;
-                    }
-                    Log.d("checkdata","table name "+ temp_table+" ,and checkdata todelete =  "+toDelete);
-                    if(toDelete){
+                    db = DatabaseManager.getInstance().openDatabase();
+                    cursor = db.rawQuery("SELECT * FROM "+temp_table, null);
+                    if(cursor.getCount()>0){
+                        cursor.moveToFirst();
+                        try{
+                            for(int i=0;i<cursor.getCount();i++){
 
-                        db = DatabaseManager.getInstance().openDatabase();
-                        cursor = db.rawQuery("SELECT * FROM "+temp_table, null);
-                        Log.d("checkdata","table name "+ temp_table+" ,rowCount before delete= "+cursor.getCount());
-                        if(cursor.getCount()>0){
-                            cursor.moveToFirst();
-                            int start=Integer.parseInt(cursor.getString(0));
-                            int last=-1;
-                            if(temp_table.equals("notification")){
-                                last=send_rowid_noti;
+                                boolean delete=false;
+                                boolean upload=false;
 
-                            }else if(temp_table.equals("usage")){
-                                last=send_rowid_usage;
+                                if(temp_table.equals("notification")){
+                                    Log.d("checkdata_new","table name "+temp_table+" snapshot "+dataSnapshot.getValue().toString());
 
-                            }else if(temp_table.equals("accessibility")){
-                                last=send_rowid_accessibility;
+                                    Log.d("checkdata_new","snapshot "+dataSnapshot.getValue().toString().indexOf("currentTime"));
+                                    int start_byte=dataSnapshot.getValue().toString().indexOf("currentTime");
+                                    Log.d("checkdata_new", "time "+dataSnapshot.getValue().toString().substring(start_byte+12,start_byte+25) );
+                                    long firebase_time=Long.parseLong(dataSnapshot.getValue().toString().substring(start_byte+12,start_byte+25));
 
-                            }else if(temp_table.equals("questionnaire")){
-                                last=send_rowid_questionnaire;
+                                    Log.d("checkdata_new","table name = "+temp_table+" time on phone "+cursor.getString(3)+" last time on firebase "+firebase_time);
 
+                                    if(Long.parseLong(cursor.getString(3))<firebase_time){
+                                        delete=true;
+                                    }else{
+                                        upload=true;
+                                    }
+
+                                }else if(temp_table.equals("usage")){
+
+                                    Log.d("checkdata_new","snapshot "+dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis"));
+                                    int start_byte=dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis");
+                                    Log.d("checkdata_new","time "+dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
+                                    long firebase_time=Long.parseLong(dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
+                                    start_byte=cursor.getString(3).indexOf("CurrentTimeInMillis");
+                                    long phone_time =Long.parseLong(cursor.getString(3).substring(start_byte+22,start_byte+35));
+
+
+
+                                    Log.d("checkdata_new","table name = "+temp_table+" time on phone "+phone_time+" last time on firebase "+firebase_time);
+
+                                    if(phone_time<firebase_time){
+                                        delete=true;
+                                    }else{
+                                        upload=true;
+                                    }
+
+                                }else if(temp_table.equals("accessibility")){
+
+                                    Log.d("checkdata_new","snapshot "+dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis"));
+                                    int start_byte=dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis");
+                                    Log.d("checkdata_new","time "+dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
+                                    long firebase_time=Long.parseLong(dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
+                                    start_byte=cursor.getString(3).indexOf("CurrentTimeInMillis");
+                                    long phone_time =Long.parseLong(cursor.getString(3).substring(start_byte+22,start_byte+35));
+
+
+
+                                    Log.d("checkdata_new","table name = "+temp_table+" time on phone "+phone_time+" last time on firebase "+firebase_time);
+
+                                    if(phone_time<firebase_time){
+                                        delete=true;
+                                    }else{
+                                        upload=true;
+                                    }
+
+                                }else if(temp_table.equals("questionnaire")){
+                                    Log.d("checkdata_new","table name "+temp_table+" snapshot "+dataSnapshot.getValue().toString());
+
+                                    Log.d("checkdata_new","snapshot "+dataSnapshot.getValue().toString().indexOf("generateTime"));
+                                    int start_byte=dataSnapshot.getValue().toString().indexOf("generateTime");
+                                    Log.d("checkdata_new","table name = "+temp_table+" start "+start_byte);
+
+                                    Log.d("checkdata_new","table name = "+temp_table+" phone time "+cursor.getString(6));
+                                    Log.d("checkdata_new","table name = "+temp_table+" firebase time "+dataSnapshot.getValue().toString().substring(start_byte+13,start_byte+26));
+
+                                    long firebase_time=Long.parseLong(dataSnapshot.getValue().toString().substring(start_byte+13,start_byte+26));
+
+                                    Log.d("checkdata_new","table name = "+temp_table+" time on phone "+cursor.getString(6)+" last time on firebase "+firebase_time);
+
+                                    if(Long.parseLong(cursor.getString(6))<firebase_time){
+                                        delete=true;
+                                    }else{
+                                        upload=true;
+                                    }
+                                }
+
+                                if(delete){
+                                    Log.d("checkdata_new","table name = "+temp_table+ "delete "+i);
+
+                                    db.delete(temp_table,"rowid="+i,null);
+                                }
+                                if(upload){
+
+                                    ArrayList<String> create_record = new ArrayList<>();
+
+
+                                    Log.d("checkdata_new","table name = "+temp_table+ "upload "+i);
+
+                                    for(int j=1;j<cursor.getColumnCount();j++){
+                                        create_record.add(cursor.getString(j));
+                                    }
+                                    if(temp_table.equals("notification")){
+
+                                        uploadToFireDB("notification",Constants.DEVICE_ID,create_record,cursor.getString(0));
+
+                                    }else if(temp_table.equals("usage")){
+
+                                        uploadToFireDB("context",Constants.DEVICE_ID,create_record,cursor.getString(0));
+
+                                    }else if(temp_table.equals("accessibility")){
+
+                                        uploadToFireDB("accessibility",Constants.DEVICE_ID,create_record,cursor.getString(0));
+
+
+                                    }else if(temp_table.equals("questionnaire")){
+
+                                        uploadToFireDB("questionnaire",Constants.DEVICE_ID,create_record,cursor.getString(0));
+
+                                    }
+
+                                    create_record.clear();
+                                }
+
+                                if(i!=cursor.getCount()-1){
+                                    cursor.moveToNext();
+                                }
                             }
-                            Log.d("checkdata","table name "+ temp_table+" before delete");
-                            Log.d("checkdata","table name "+ temp_table+" before delete from start= "+start +"last= "+last);
-                            for(int i=start;i<=last;i++){
-                                db.delete(temp_table,"rowid="+i,null);
-                            }
 
-                            Log.d("checkdata","table name "+ temp_table+" rowCount after delete= "+cursor.getCount());
-
+                        }finally {
                             cursor.close();
                             DatabaseManager.getInstance().closeDatabase();
-
                         }
 
+                    }else{
+                        cursor.close();
+                        DatabaseManager.getInstance().closeDatabase();
+                    }
+
+                }else{
+                    Log.d("checkdata_new","table name = "+temp_table+ "dataSnapshot.getValue is null");
+
+                    db = DatabaseManager.getInstance().openDatabase();
+                    cursor = db.rawQuery("SELECT * FROM "+temp_table, null);
+                    if(cursor.getCount()>0){
+                        cursor.moveToFirst();
+                        try{
+                            for(int i=0;i<cursor.getCount();i++){
+
+                                ArrayList<String> create_record = new ArrayList<>();
+
+                                Log.d("checkdata_new","table name = "+temp_table+ "upload "+i);
+
+                                for(int j=1;j<cursor.getColumnCount();j++){
+                                    create_record.add(cursor.getString(j));
+                                }
+                                if(temp_table.equals("notification")){
+
+                                    uploadToFireDB("notification",Constants.DEVICE_ID,create_record,cursor.getString(0));
+
+                                }else if(temp_table.equals("usage")){
+
+                                    uploadToFireDB("context",Constants.DEVICE_ID,create_record,cursor.getString(0));
+
+                                }else if(temp_table.equals("accessibility")){
+
+                                    uploadToFireDB("accessibility",Constants.DEVICE_ID,create_record,cursor.getString(0));
+
+
+                                }else if(temp_table.equals("questionnaire")){
+
+                                    uploadToFireDB("questionnaire",Constants.DEVICE_ID,create_record,cursor.getString(0));
+
+                                }
+
+                                create_record.clear();
+
+                                if(i!=cursor.getCount()-1){
+                                    cursor.moveToNext();
+                                }
+                            }
+
+                        }finally {
+                            cursor.close();
+                            DatabaseManager.getInstance().closeDatabase();
+                        }
+
+                    }else{
+                        cursor.close();
+                        DatabaseManager.getInstance().closeDatabase();
                     }
 
 
                 }
+
             }
 
             @Override
@@ -1492,7 +1639,7 @@ public class UsageService extends Service {
         Log.d("db","query item after select");
 
         Log.d("checkdata","table name "+ table+ " start check");
-        checkLastData(table,Constants.DEVICE_ID);
+        //checkLastData(table,Constants.DEVICE_ID);
 
         Log.d("checkdata","table name "+ table+ " after check");
 
@@ -1542,7 +1689,7 @@ public class UsageService extends Service {
                             uploadToFireDB("notification",Constants.DEVICE_ID,create_record,cursor.getString(0));
                             send_rowid_noti=Integer.parseInt(cursor.getString(0));
                             //last=send_rowid_noti;
-                            noti_key = create_record.get(1)+"|"+cursor.getString(0);
+                            noti_key = create_record.get(2);
 
                         }else if(table.equals("usage")){
                             Log.d("db","size of create usage = "+create_record.size());
@@ -1552,7 +1699,7 @@ public class UsageService extends Service {
                             uploadToFireDB("context",Constants.DEVICE_ID,create_record,cursor.getString(0));
                             send_rowid_usage=Integer.parseInt(cursor.getString(0));
                             //last=send_rowid_usage;
-                            usage_key = create_record.get(1)+"|"+cursor.getString(0);
+                            usage_key = create_record.get(2);
 
                         }else if(table.equals("accessibility")){
                             Log.d("db","size of create accessibility = "+create_record.size());
@@ -1561,7 +1708,7 @@ public class UsageService extends Service {
                             uploadToFireDB("accessibility",Constants.DEVICE_ID,create_record,cursor.getString(0));
                             send_rowid_accessibility=Integer.parseInt(cursor.getString(0));
                             //last=send_rowid_accessibility;
-                            accessibility_key = create_record.get(1)+"|"+cursor.getString(0);
+                            accessibility_key = create_record.get(2);
 
 
                         }else if(table.equals("questionnaire")){
@@ -1571,10 +1718,12 @@ public class UsageService extends Service {
                             uploadToFireDB("questionnaire",Constants.DEVICE_ID,create_record,cursor.getString(0));
                             send_rowid_questionnaire=Integer.parseInt(cursor.getString(0));
                             //last=send_rowid_questionnaire;
-                            questionnaire_key = create_record.get(1)+"|"+cursor.getString(0);
+                            questionnaire_key = create_record.get(5);
 
                         }
-                        cursor.moveToNext();
+                        if(i!=row-1){
+                            cursor.moveToNext();
+                        }
                         create_record.clear();
                     }
                 }finally {

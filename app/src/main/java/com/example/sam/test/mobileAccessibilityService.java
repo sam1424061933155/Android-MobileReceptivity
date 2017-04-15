@@ -124,19 +124,27 @@ public class mobileAccessibilityService  extends AccessibilityService {
 
         //UsageService.insertSQLite("accessibility",info);
 
-        if(UsageService.usage_start==1 && DBHelper.checkdb==1){
-            if(DatabaseManager.getInstance() == null){
-                Log.d("access","in null");
-                WaitList.add(info);
-            }else{
-                WaitList.add(info);
-                for(int i=0;i<WaitList.size();i++){
-                    UsageService.insertSQLite("accessibility",WaitList.get(i));
-                }
-                Log.d("access","not null");
+        if(UsageService.usage_start==1){
+            try{
+                if(DatabaseManager.getInstance() == null){
+                    Log.d("access","in null");
+                    WaitList.add(info);
+                }else{
+                    WaitList.add(info);
+                    for(int i=0;i<WaitList.size();i++){
+                        UsageService.insertSQLite("accessibility",WaitList.get(i));
+                    }
+                    Log.d("access","not null");
 
-                WaitList.clear();
+                    WaitList.clear();
+                }
+
+            }catch (IllegalStateException e){
+                DBHelper dbhelper = new DBHelper(this);
+                DatabaseManager.initializeInstance(dbhelper);
+                e.printStackTrace();
             }
+
         }
         info.clear();
 
