@@ -36,13 +36,13 @@ public class ScreenStatusReceiver extends BroadcastReceiver {
         if(intent.getAction().equalsIgnoreCase(Intent.ACTION_SCREEN_ON)) {
 
             ScreenState = "On";
-            getUpdate("ScreenOn");
+            getUpdate("ScreenOn", context);
             Log.d(LOG_TAG,"screen on");
         }
         else if(intent.getAction().equalsIgnoreCase(Intent.ACTION_SCREEN_OFF)) {
 
             ScreenState = "Off";
-            getUpdate("ScreenOff");
+            getUpdate("ScreenOff",context);
             Log.d(LOG_TAG,"screen off");
 
 
@@ -50,7 +50,7 @@ public class ScreenStatusReceiver extends BroadcastReceiver {
 
     }
 
-    public void getUpdate(String action){
+    public void getUpdate(String action,Context context){
 
         long time=getCurrentTimeInMillis();
         String format_time = DateFormat.format("yyyy-MM-dd HH:mm:ss z",time).toString();
@@ -78,20 +78,27 @@ public class ScreenStatusReceiver extends BroadcastReceiver {
 
         ArrayList<String> info = new ArrayList<>();
         info.add(content.toString());
-        if(UsageService.usage_start==1 && DBHelper.checkdb==1){
-            if(DatabaseManager.getInstance() == null){
-                WaitList.add(info);
-                Log.d("access","in null");
+        if(UsageService.usage_start==1){
+            try{
+                if(DatabaseManager.getInstance() == null){
+                    Log.d("access","in null");
+                    WaitList.add(info);
+                }else{
+                    WaitList.add(info);
+                    for(int i=0;i<WaitList.size();i++){
+                        UsageService.insertSQLite("accessibility",WaitList.get(i));
+                    }
+                    Log.d("access","not null");
 
-            }else{
-                WaitList.add(info);
-                for(int i=0;i<WaitList.size();i++){
-                    UsageService.insertSQLite("accessibility",WaitList.get(i));
+                    WaitList.clear();
                 }
-                WaitList.clear();
-                Log.d("access","not null");
 
+            }catch (IllegalStateException e){
+                DBHelper dbhelper = new DBHelper(context);
+                DatabaseManager.initializeInstance(dbhelper);
+                e.printStackTrace();
             }
+
         }
             //UsageService.insertSQLite("accessibility",info);
         info.clear();

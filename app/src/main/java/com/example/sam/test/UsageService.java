@@ -514,6 +514,8 @@ public class UsageService extends Service {
             Log.d("test","nowtime is= "+nowtime);
             //get the application usage statistics
             //Log.d("runnable","inrunnable before createfile");
+            diffTime=(float)((nowtime-lastTimeSend)/(60*60*1000.0));   // in hour
+
             createNewFile();
 
 
@@ -589,14 +591,14 @@ public class UsageService extends Service {
                     //Log.d("usage","after usage_list clear");
 
                     Log.d("close",String.valueOf(screenClose));
-                    diffTime=(float)((nowtime-lastTimeSend)/(60*60*1000.0));   // in hour
+                    //diffTime=(float)((nowtime-lastTimeSend)/(60*60*1000.0));   // in hour
 
                     //Log.d("data","currenttime= "+String.valueOf(nowtime)+" lastsend= "+String.valueOf(lastTimeSend));
                     Log.d("data ","nowtime= "+nowtime+" lastimesend= "+lastTimeSend+" difftime= "+String.valueOf(diffTime));
                     //Log.d("data ","inprocess="+String.valueOf(inPrcoess));
 
                     if(StartQuestionnaire==1){
-                        if(  ((powerMgr.isInteractive()==true && screenClose==1) || (powerMgr.isInteractive() && (lastPackage!=mySortedMap.get(mySortedMap.lastKey()).getPackageName())) ) &&  diffTime>=1.5 && inPrcoess==0 ){
+                        if(  ((powerMgr.isInteractive()==true && screenClose==1) || (powerMgr.isInteractive() && (lastPackage!=mySortedMap.get(mySortedMap.lastKey()).getPackageName())) ) &&  diffTime>=0.1 && inPrcoess==0 ){
                             writeSystemLog(getCurrentTimeInMillis(),"usage service able to send questionnaire");
                             inPrcoess=1;
 
@@ -1430,6 +1432,8 @@ public class UsageService extends Service {
                     db = DatabaseManager.getInstance().openDatabase();
                     cursor = db.rawQuery("SELECT * FROM "+temp_table, null);
                     if(cursor.getCount()>0){
+                        Log.d("checkdata_new","table name = "+temp_table+ " number of row in db = "+cursor.getCount());
+
                         cursor.moveToFirst();
                         try{
                             for(int i=0;i<cursor.getCount();i++){
@@ -1437,92 +1441,111 @@ public class UsageService extends Service {
                                 boolean delete=false;
                                 boolean upload=false;
 
-                                if(temp_table.equals("notification")){
-                                    Log.d("checkdata_new","table name "+temp_table+" snapshot "+dataSnapshot.getValue().toString());
+                                try{
+                                    if(temp_table.equals("notification")){
+                                        Log.d("checkdata_new","table name "+temp_table+" snapshot "+dataSnapshot.getValue().toString());
 
-                                    Log.d("checkdata_new","snapshot "+dataSnapshot.getValue().toString().indexOf("currentTime"));
-                                    int start_byte=dataSnapshot.getValue().toString().indexOf("currentTime");
-                                    Log.d("checkdata_new", "time "+dataSnapshot.getValue().toString().substring(start_byte+12,start_byte+25) );
-                                    long firebase_time=Long.parseLong(dataSnapshot.getValue().toString().substring(start_byte+12,start_byte+25));
+                                        Log.d("checkdata_new","snapshot "+dataSnapshot.getValue().toString().indexOf("currentTime"));
+                                        int start_byte=dataSnapshot.getValue().toString().indexOf("currentTime");
+                                        Log.d("checkdata_new", "time "+dataSnapshot.getValue().toString().substring(start_byte+12,start_byte+25) );
+                                        long firebase_time=Long.parseLong(dataSnapshot.getValue().toString().substring(start_byte+12,start_byte+25));
 
-                                    Log.d("checkdata_new","table name = "+temp_table+" time on phone "+cursor.getString(3)+" last time on firebase "+firebase_time);
+                                        Log.d("checkdata_new","table name = "+temp_table+" time on phone "+cursor.getString(3)+" last time on firebase "+firebase_time);
 
-                                    if(Long.parseLong(cursor.getString(3))<firebase_time){
-                                        delete=true;
-                                    }else{
-                                        upload=true;
+                                        if(Long.parseLong(cursor.getString(3))<firebase_time){
+                                            delete=true;
+                                        }else{
+                                            upload=true;
+                                        }
+
+                                    }else if(temp_table.equals("usage")){
+
+                                        Log.d("checkdata_new","snapshot "+dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis"));
+                                        int start_byte=dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis");
+                                        Log.d("checkdata_new","time "+dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
+                                        long firebase_time=Long.parseLong(dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
+                                        start_byte=cursor.getString(3).indexOf("CurrentTimeInMillis");
+                                        long phone_time =Long.parseLong(cursor.getString(3).substring(start_byte+22,start_byte+35));
+
+
+
+                                        Log.d("checkdata_new","table name = "+temp_table+" time on phone "+phone_time+" last time on firebase "+firebase_time);
+
+                                        if(phone_time<firebase_time){
+                                            delete=true;
+                                        }else{
+                                            upload=true;
+                                        }
+
+                                    }else if(temp_table.equals("accessibility")){
+
+                                        Log.d("checkdata_new","snapshot "+dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis"));
+                                        int start_byte=dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis");
+                                        Log.d("checkdata_new","time "+dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
+                                        long firebase_time=Long.parseLong(dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
+                                        start_byte=cursor.getString(3).indexOf("CurrentTimeInMillis");
+                                        long phone_time =Long.parseLong(cursor.getString(3).substring(start_byte+22,start_byte+35));
+
+
+
+                                        Log.d("checkdata_new","table name = "+temp_table+" time on phone "+phone_time+" last time on firebase "+firebase_time);
+
+                                        if(phone_time<firebase_time){
+                                            delete=true;
+                                        }else{
+                                            upload=true;
+                                        }
+
+                                    }else if(temp_table.equals("questionnaire")){
+
+                                        if((float)((getCurrentTimeInMillis()-Long.parseLong(cursor.getString(6)))/(1000*60*60.0))>0.1){
+                                            Log.d("checkdata_new","table name = "+temp_table+" time is ready");
+
+                                            Log.d("checkdata_new","table name = "+temp_table+" number of data "+cursor.getColumnCount());
+
+                                            Log.d("checkdata_new","table name "+temp_table+" snapshot "+dataSnapshot.getValue().toString());
+
+                                            Log.d("checkdata_new","snapshot "+dataSnapshot.getValue().toString().indexOf("GenerateTime"));
+                                            int Q_start_byte=dataSnapshot.getValue().toString().indexOf("GenerateTime");
+                                            Log.d("checkdata_new","table name = "+temp_table+" start "+Q_start_byte);
+                                            Log.d("checkdata_new","table name = "+temp_table+" phone time "+cursor.getString(5));
+
+                                            Log.d("checkdata_new","table name = "+temp_table+" phone time "+cursor.getString(6));
+                                            Log.d("checkdata_new","table name = "+temp_table+" firebase time "+dataSnapshot.getValue().toString().substring(Q_start_byte+13,Q_start_byte+26));
+
+                                            long firebase_time=Long.parseLong(dataSnapshot.getValue().toString().substring(Q_start_byte+13,Q_start_byte+26));
+
+                                            Log.d("checkdata_new","table name = "+temp_table+" time on phone "+cursor.getString(6)+" last time on firebase "+firebase_time);
+
+                                            if(Long.parseLong(cursor.getString(6))<firebase_time){
+                                                delete=true;
+                                            }else{
+                                                upload=true;
+                                            }
+
+
+                                        }
+
                                     }
 
-                                }else if(temp_table.equals("usage")){
-
-                                    Log.d("checkdata_new","snapshot "+dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis"));
-                                    int start_byte=dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis");
-                                    Log.d("checkdata_new","time "+dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
-                                    long firebase_time=Long.parseLong(dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
-                                    start_byte=cursor.getString(3).indexOf("CurrentTimeInMillis");
-                                    long phone_time =Long.parseLong(cursor.getString(3).substring(start_byte+22,start_byte+35));
-
-
-
-                                    Log.d("checkdata_new","table name = "+temp_table+" time on phone "+phone_time+" last time on firebase "+firebase_time);
-
-                                    if(phone_time<firebase_time){
-                                        delete=true;
-                                    }else{
-                                        upload=true;
-                                    }
-
-                                }else if(temp_table.equals("accessibility")){
-
-                                    Log.d("checkdata_new","snapshot "+dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis"));
-                                    int start_byte=dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis");
-                                    Log.d("checkdata_new","time "+dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
-                                    long firebase_time=Long.parseLong(dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
-                                    start_byte=cursor.getString(3).indexOf("CurrentTimeInMillis");
-                                    long phone_time =Long.parseLong(cursor.getString(3).substring(start_byte+22,start_byte+35));
-
-
-
-                                    Log.d("checkdata_new","table name = "+temp_table+" time on phone "+phone_time+" last time on firebase "+firebase_time);
-
-                                    if(phone_time<firebase_time){
-                                        delete=true;
-                                    }else{
-                                        upload=true;
-                                    }
-
-                                }else if(temp_table.equals("questionnaire")){
-                                    Log.d("checkdata_new","table name "+temp_table+" snapshot "+dataSnapshot.getValue().toString());
-
-                                    Log.d("checkdata_new","snapshot "+dataSnapshot.getValue().toString().indexOf("generateTime"));
-                                    int start_byte=dataSnapshot.getValue().toString().indexOf("generateTime");
-                                    Log.d("checkdata_new","table name = "+temp_table+" start "+start_byte);
-
-                                    Log.d("checkdata_new","table name = "+temp_table+" phone time "+cursor.getString(6));
-                                    Log.d("checkdata_new","table name = "+temp_table+" firebase time "+dataSnapshot.getValue().toString().substring(start_byte+13,start_byte+26));
-
-                                    long firebase_time=Long.parseLong(dataSnapshot.getValue().toString().substring(start_byte+13,start_byte+26));
-
-                                    Log.d("checkdata_new","table name = "+temp_table+" time on phone "+cursor.getString(6)+" last time on firebase "+firebase_time);
-
-                                    if(Long.parseLong(cursor.getString(6))<firebase_time){
-                                        delete=true;
-                                    }else{
-                                        upload=true;
-                                    }
+                                }catch (IllegalStateException e){
+                                    delete=false;
+                                    upload=false;
+                                    e.printStackTrace();
                                 }
 
-                                if(delete){
-                                    Log.d("checkdata_new","table name = "+temp_table+ "delete "+i);
 
-                                    db.delete(temp_table,"rowid="+i,null);
+                                if(delete){
+                                    Log.d("checkdata_new","table name = "+temp_table+ "delete "+cursor.getString(0));
+
+                                    db.delete(temp_table,"rowid="+cursor.getString(0),null);
                                 }
                                 if(upload){
 
                                     ArrayList<String> create_record = new ArrayList<>();
 
 
-                                    Log.d("checkdata_new","table name = "+temp_table+ "upload "+i);
+                                    Log.d("checkdata_new","table name = "+temp_table+ "upload "+cursor.getString(0));
 
                                     for(int j=1;j<cursor.getColumnCount();j++){
                                         create_record.add(cursor.getString(j));
@@ -1541,8 +1564,10 @@ public class UsageService extends Service {
 
 
                                     }else if(temp_table.equals("questionnaire")){
+                                        Log.d("checkdata_new","table name = "+temp_table+" record  size"+create_record.size());
 
-                                        uploadToFireDB("questionnaire",Constants.DEVICE_ID,create_record,cursor.getString(0));
+                                        Log.d("checkdata_new","table name = "+temp_table+" record "+create_record.toString());
+                                        uploadToFireDB("questionnaire", Constants.DEVICE_ID, create_record, cursor.getString(0));
 
                                     }
 
@@ -1576,7 +1601,7 @@ public class UsageService extends Service {
 
                                 ArrayList<String> create_record = new ArrayList<>();
 
-                                Log.d("checkdata_new","table name = "+temp_table+ "upload "+i);
+                                Log.d("checkdata_new","table name = "+temp_table+ " upload "+i);
 
                                 for(int j=1;j<cursor.getColumnCount();j++){
                                     create_record.add(cursor.getString(j));
@@ -1596,8 +1621,14 @@ public class UsageService extends Service {
 
                                 }else if(temp_table.equals("questionnaire")){
 
-                                    uploadToFireDB("questionnaire",Constants.DEVICE_ID,create_record,cursor.getString(0));
+                                    if((float)((getCurrentTimeInMillis()-Long.parseLong(cursor.getString(6)))/(1000*60*60.0))>0.1) {
+                                        Log.d("checkdata_new", "table name = " + temp_table + " time is ready");
 
+                                        Log.d("checkdata_new", "table name = " + temp_table + " number of data " + cursor.getColumnCount());
+
+                                        uploadToFireDB("questionnaire", Constants.DEVICE_ID, create_record, cursor.getString(0));
+
+                                    }
                                 }
 
                                 create_record.clear();

@@ -19,6 +19,8 @@ public class Record {
     public String timeToSQLite;
     public String data;
 
+
+
     public Record(){
 
     }
@@ -43,7 +45,6 @@ public class Record {
     public String getTimeToSQLite(){
         return timeToSQLite;
     }
-
 
 
 

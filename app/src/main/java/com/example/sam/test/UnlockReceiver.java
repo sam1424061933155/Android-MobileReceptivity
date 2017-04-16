@@ -58,20 +58,27 @@ public class UnlockReceiver extends BroadcastReceiver {
 
             ArrayList<String> info = new ArrayList<>();
             info.add(content.toString());
-            if(UsageService.usage_start==1 && DBHelper.checkdb==1){
-                if(DatabaseManager.getInstance() == null){
-                    WaitList.add(info);
-                    Log.d("access","in null");
+            if(UsageService.usage_start==1){
+                try{
+                    if(DatabaseManager.getInstance() == null){
+                        Log.d("access","in null");
+                        WaitList.add(info);
+                    }else{
+                        WaitList.add(info);
+                        for(int i=0;i<WaitList.size();i++){
+                            UsageService.insertSQLite("accessibility",WaitList.get(i));
+                        }
+                        Log.d("access","not null");
 
-                }else{
-                    WaitList.add(info);
-                    for(int i=0;i<WaitList.size();i++){
-                        UsageService.insertSQLite("accessibility",WaitList.get(i));
+                        WaitList.clear();
                     }
-                    WaitList.clear();
-                    Log.d("access","not null");
 
+                }catch (IllegalStateException e){
+                    DBHelper dbhelper = new DBHelper(context);
+                    DatabaseManager.initializeInstance(dbhelper);
+                    e.printStackTrace();
                 }
+
             }
 
             //UsageService.insertSQLite("accessibility",info);
