@@ -1443,57 +1443,69 @@ public class UsageService extends Service {
 
                                 try{
                                     if(temp_table.equals("notification")){
-                                        Log.d("checkdata_new","table name "+temp_table+" snapshot "+dataSnapshot.getValue().toString());
 
-                                        Log.d("checkdata_new","snapshot "+dataSnapshot.getValue().toString().indexOf("currentTime"));
-                                        int start_byte=dataSnapshot.getValue().toString().indexOf("currentTime");
-                                        Log.d("checkdata_new", "time "+dataSnapshot.getValue().toString().substring(start_byte+12,start_byte+25) );
-                                        long firebase_time=Long.parseLong(dataSnapshot.getValue().toString().substring(start_byte+12,start_byte+25));
+                                        if((float)((getCurrentTimeInMillis()-Long.parseLong(cursor.getString(3)))/(1000*60*60.0))>0.002){
 
-                                        Log.d("checkdata_new","table name = "+temp_table+" time on phone "+cursor.getString(3)+" last time on firebase "+firebase_time);
+                                            Log.d("checkdata_new","table name "+temp_table+" snapshot "+dataSnapshot.getValue().toString());
 
-                                        if(Long.parseLong(cursor.getString(3))<firebase_time){
-                                            delete=true;
-                                        }else{
-                                            upload=true;
+                                            Log.d("checkdata_new","snapshot "+dataSnapshot.getValue().toString().indexOf("currentTime"));
+                                            int start_byte=dataSnapshot.getValue().toString().indexOf("currentTime");
+                                            Log.d("checkdata_new", "time "+dataSnapshot.getValue().toString().substring(start_byte+12,start_byte+25) );
+                                            long firebase_time=Long.parseLong(dataSnapshot.getValue().toString().substring(start_byte+12,start_byte+25));
+
+                                            Log.d("checkdata_new","table name = "+temp_table+" time on phone "+cursor.getString(3)+" last time on firebase "+firebase_time);
+
+                                            if(Long.parseLong(cursor.getString(3))<firebase_time){
+                                                delete=true;
+                                            }else{
+                                                upload=true;
+                                            }
                                         }
 
                                     }else if(temp_table.equals("usage")){
 
-                                        Log.d("checkdata_new","snapshot "+dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis"));
-                                        int start_byte=dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis");
-                                        Log.d("checkdata_new","time "+dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
-                                        long firebase_time=Long.parseLong(dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
-                                        start_byte=cursor.getString(3).indexOf("CurrentTimeInMillis");
-                                        long phone_time =Long.parseLong(cursor.getString(3).substring(start_byte+22,start_byte+35));
+                                        int start_byte =cursor.getString(3).indexOf("CurrentTimeInMillis");
 
+                                        if((float)((getCurrentTimeInMillis()-Long.parseLong(cursor.getString(3).substring(start_byte+22,start_byte+35)))/(1000*60*60.0))>0.002){
 
+                                            Log.d("checkdata_new","snapshot "+dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis"));
+                                            start_byte=dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis");
+                                            Log.d("checkdata_new","time "+dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
+                                            long firebase_time=Long.parseLong(dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
+                                            start_byte=cursor.getString(3).indexOf("CurrentTimeInMillis");
+                                            long phone_time =Long.parseLong(cursor.getString(3).substring(start_byte+22,start_byte+35));
 
-                                        Log.d("checkdata_new","table name = "+temp_table+" time on phone "+phone_time+" last time on firebase "+firebase_time);
+                                            Log.d("checkdata_new","table name = "+temp_table+" time on phone "+phone_time+" last time on firebase "+firebase_time);
 
-                                        if(phone_time<firebase_time){
-                                            delete=true;
-                                        }else{
-                                            upload=true;
+                                            if(phone_time<firebase_time){
+                                                delete=true;
+                                            }else{
+                                                upload=true;
+                                            }
                                         }
 
                                     }else if(temp_table.equals("accessibility")){
 
-                                        Log.d("checkdata_new","snapshot "+dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis"));
-                                        int start_byte=dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis");
-                                        Log.d("checkdata_new","time "+dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
-                                        long firebase_time=Long.parseLong(dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
-                                        start_byte=cursor.getString(3).indexOf("CurrentTimeInMillis");
-                                        long phone_time =Long.parseLong(cursor.getString(3).substring(start_byte+22,start_byte+35));
+                                        int start_byte =cursor.getString(3).indexOf("CurrentTimeInMillis");
+
+                                        if((float)((getCurrentTimeInMillis()-Long.parseLong(cursor.getString(3).substring(start_byte+22,start_byte+35)))/(1000*60*60.0))>0.002){
+
+                                            Log.d("checkdata_new","snapshot "+dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis"));
+                                            start_byte=dataSnapshot.getValue().toString().indexOf("CurrentTimeInMillis");
+                                            Log.d("checkdata_new","time "+dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
+                                            long firebase_time=Long.parseLong(dataSnapshot.getValue().toString().substring(start_byte+22,start_byte+35));
+                                            start_byte=cursor.getString(3).indexOf("CurrentTimeInMillis");
+                                            long phone_time =Long.parseLong(cursor.getString(3).substring(start_byte+22,start_byte+35));
 
 
 
-                                        Log.d("checkdata_new","table name = "+temp_table+" time on phone "+phone_time+" last time on firebase "+firebase_time);
+                                            Log.d("checkdata_new","table name = "+temp_table+" time on phone "+phone_time+" last time on firebase "+firebase_time);
 
-                                        if(phone_time<firebase_time){
-                                            delete=true;
-                                        }else{
-                                            upload=true;
+                                            if(phone_time<firebase_time){
+                                                delete=true;
+                                            }else{
+                                                upload=true;
+                                            }
                                         }
 
                                     }else if(temp_table.equals("questionnaire")){
@@ -1532,6 +1544,9 @@ public class UsageService extends Service {
                                     delete=false;
                                     upload=false;
                                     e.printStackTrace();
+                                }catch (NumberFormatException e){
+                                    delete=false;
+                                    upload=false;
                                 }
 
 
